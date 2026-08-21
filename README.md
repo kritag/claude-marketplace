@@ -7,8 +7,12 @@ Claude Code fetches the content at install time.
 
 ## Install on a new machine
 
+While this repo is private, add it by the SSH remote this machine uses for the
+account that owns it — not the `owner/repo` shorthand, which resolves over HTTPS
+and can't authenticate here:
+
 ```bash
-claude plugin marketplace add kritag/claude-marketplace
+claude plugin marketplace add <ssh-remote-for-this-repo>
 claude plugin install stop-slop@kritag-tools --scope user
 ```
 
@@ -18,12 +22,15 @@ Or declare it in `~/.claude/settings.json` and skip the commands entirely:
 {
   "extraKnownMarketplaces": {
     "kritag-tools": {
-      "source": { "source": "github", "repo": "kritag/claude-marketplace" }
+      "source": { "source": "url", "url": "<ssh-remote-for-this-repo>" }
     }
   },
   "enabledPlugins": { "stop-slop@kritag-tools": true }
 }
 ```
+
+The key must be loaded in `ssh-agent`. Background marketplace refreshes run with
+git credential helpers disabled, so SSH is the only auth that works unattended.
 
 ## Adding a skill
 
