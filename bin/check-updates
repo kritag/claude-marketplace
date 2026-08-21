@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Compare each pinned sha against upstream HEAD of its ref.
+set -euo pipefail
+M="$(dirname "$0")/../.claude-plugin/marketplace.json"
+jq -r '.plugins[]
+  | select(.source | type == "object")
+  | select(.source.source == "github" or .source.source == "git-subdir")
+  | [ .name,
+      (.source.repo // .source.url),
+      (.source.ref // "HEAD"),
+      (.source.sha // "unpinned") ] | @tsv' "$M" |
+while IFS=$'\t' read -r name repo ref pinned; do
+  case "$repo" in
+    *://*|*@*) url="$repo" ;;
+    *)         url="https://github.com/$repo" ;;
+  esac
+  upstream="$(git ls-remote "$url" "$ref" 2>/dev/null | cut -f1)"
+  if [ -z "$upstream" ]; then
+    printf '%-24s ref %-12s UNREACHABLE\n' "$name" "$ref"
+  elif [ "$upstream" = "$pinned" ]; then
+    printf '%-24s ref %-12s up to date\n' "$name" "$ref"
+  else
+    printf '%-24s ref %-12s BEHIND\n  pinned:   %s\n  upstream: %s\n  diff: %s/compare/%s...%s\n' \
+      "$name" "$ref" "$pinned" "$upstream" \
+      "https://github.com/$repo" "${pinned:0:12}" "${upstream:0:12}"
+  fi
+done

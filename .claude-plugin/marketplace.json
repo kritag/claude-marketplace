@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "kritag-tools",
+  "description": "Curated third-party Claude Code skills, each pinned to a reviewed commit.",
+  "owner": {
+    "name": "kritag",
+    "email": "3776749+kritag@users.noreply.github.com",
+    "url": "https://github.com/kritag"
+  },
+  "plugins": [
+    {
+      "name": "stop-slop",
+      "source": {
+        "source": "github",
+        "repo": "hardikpandya/stop-slop",
+        "ref": "main",
+        "sha": "8da1f030185bdfe8471220585162991eaeb970e9"
+      },
+      "strict": false,
+      "skills": ".",
+      "category": "writing",
+      "description": "Remove AI writing patterns from prose. Use when drafting, editing, or reviewing text to eliminate predictable AI tells.",
+      "author": { "name": "Hardik Pandya", "url": "https://hvpandya.com" },
+      "homepage": "https://github.com/hardikpandya/stop-slop",
+      "license": "MIT"
+    }
+  ]
+}
