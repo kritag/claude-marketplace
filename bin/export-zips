@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Package each installed skill as a zip for upload to claude.ai
+#   bin/export-zips            faithful copy of the pinned skill
+#   bin/export-zips --lean     minus images and repo-level docs (smaller uploads)
+# (Customize > Skills > + > Create skill > Upload a skill).
+# Mobile and browser read skills from your claude.ai account, not from this machine.
+set -euo pipefail
+LEAN=0
+if [ "${1:-}" = "--lean" ]; then LEAN=1; shift; fi
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MKT="$(jq -r .name "$ROOT/.claude-plugin/marketplace.json")"
+OUT="${1:-$ROOT/dist}"
+CACHE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/$MKT"
+
+command -v zip >/dev/null || { echo "zip not installed" >&2; exit 1; }
+mkdir -p "$OUT"
+
+jq -r '.plugins[].name' "$ROOT/.claude-plugin/marketplace.json" | while read -r name; do
+  src="$(find "$CACHE/$name" -maxdepth 2 -name SKILL.md -print -quit 2>/dev/null || true)"
+  if [ -z "$src" ]; then
+    printf '  %-16s SKIP (not installed locally)\n' "$name"; continue
+  fi
+  src="$(dirname "$src")"
+  stage="$(mktemp -d)"
+  mkdir -p "$stage/$name"
+  # copy the skill, minus git metadata and lockfiles claude.ai has no use for
+  (cd "$src" && tar -cf - \
+      --exclude=.git --exclude=.git/'*' --exclude=.in_use --exclude=.in_use/'*' \
+      --exclude=.github --exclude=.gitignore .) | tar -xf - -C "$stage/$name"
+  if [ "$LEAN" = 1 ]; then
+    # drop what only matters on GitHub: screenshots, badges, repo-level docs
+    find "$stage/$name" -maxdepth 2 \
+      \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' \
+         -o -iname '*.svg' -o -iname '*.webp' -o -iname 'README*' \
+         -o -iname 'CHANGELOG*' -o -iname 'USER-GUIDE*' \) -delete 2>/dev/null || true
+  fi
+  rm -f "$OUT/$name.zip"
+  (cd "$stage" && zip -qr "$OUT/$name.zip" "$name")
+  rm -rf "$stage"
+  printf '  %-16s %s (%s)\n' "$name" "$OUT/$name.zip" \
+    "$(du -h "$OUT/$name.zip" | cut -f1 | tr -d ' ')"
+done
+echo
+echo "Upload each at claude.ai: Customize > Skills > + > Create skill > Upload a skill."

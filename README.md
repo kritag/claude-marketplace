@@ -81,3 +81,25 @@ push for you, which is why they exist.
 
 After either script, restart Claude Code — skills are discovered at session
 start.
+
+## Using these skills on claude.ai, mobile, and in the browser
+
+Claude Code skills live on the machine that runs the CLI. Nothing syncs them up
+to your claude.ai account, so the phone app and browser can't see them. Syncing
+only runs the other way: skills enabled on claude.ai can be pulled down into
+Claude Code with `CLAUDE_CODE_SYNC_SKILLS=1` on a non-interactive run.
+
+To use them elsewhere, upload each one to your account:
+
+```bash
+bin/export-zips --lean          # writes dist-lean/<skill>.zip
+```
+
+Then on claude.ai: **Customize > Skills > + > Create skill > Upload a skill.**
+
+`--lean` drops screenshots and repo-level docs, which matters more than it
+sounds: `task-observer` ships 3.2 MB of PNGs and goes from 3.1 MB to 32 KB.
+Omit the flag for a faithful copy of the pinned skill.
+
+Cowork and cloud sessions also read skills from your claude.ai account rather
+than from this machine, so uploading covers those too.
