@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Add a skill from a GitHub repo to the marketplace, pinned to its current sha.
+#
+#   bin/add-skill owner/repo                      # SKILL.md at repo root
+#   bin/add-skill owner/repo --path skills/pdf    # skill inside a monorepo
+#   bin/add-skill owner/repo --ref v2.0.0
+#   bin/add-skill owner/repo --name my-name --no-install
+set -euo pipefail
+
+REPO=""; SUBPATH=""; REF=""; NAME=""; INSTALL=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --path)       SUBPATH="$2"; shift 2 ;;
+    --ref)        REF="$2";     shift 2 ;;
+    --name)       NAME="$2";    shift 2 ;;
+    --no-install) INSTALL=0;    shift ;;
+    -h|--help)    sed -n '2,8p' "$0"; exit 0 ;;
+    -*)           echo "unknown flag: $1" >&2; exit 1 ;;
+    *)            REPO="$1";    shift ;;
+  esac
+done
+[ -n "$REPO" ] || { echo "usage: $(basename "$0") owner/repo [--path DIR] [--ref REF] [--name NAME] [--no-install]" >&2; exit 1; }
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MANIFEST="$ROOT/.claude-plugin/marketplace.json"
+MKT="$(jq -r .name "$MANIFEST")"
+
+# normalize owner/repo vs full URL
+case "$REPO" in
+  *://*|*@*:*) URL="$REPO"; SLUG="$(printf '%s' "$REPO" | sed -E 's#.*[:/]([^/]+/[^/]+?)(\.git)?$#\1#')" ;;
+  */*)         SLUG="$REPO"; URL="https://github.com/$REPO" ;;
+  *)           echo "expected owner/repo or a git URL, got: $REPO" >&2; exit 1 ;;
+esac
+REF="${REF:-$(git ls-remote --symref "$URL" HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\(.*\)\tHEAD$#\1#p')}"
+REF="${REF:-main}"
+
+SHA="$(git ls-remote "$URL" "$REF" | cut -f1 | head -1)"
+[ -n "$SHA" ] || { echo "cannot resolve $URL ref '$REF' — is the ref name right?" >&2; exit 1; }
+
+# fetch just enough to inspect the layout
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+git init -q "$TMP/r"
+git -C "$TMP/r" remote add origin "$URL"
+git -C "$TMP/r" fetch -q --depth 1 origin "$SHA"
+git -C "$TMP/r" checkout -q FETCH_HEAD
+DIR="$TMP/r${SUBPATH:+/$SUBPATH}"
+[ -d "$DIR" ] || { echo "path '$SUBPATH' does not exist in $SLUG at $REF" >&2; exit 1; }
+
+# classify the layout -> how the marketplace entry must expose it
+if   [ -f "$DIR/.claude-plugin/plugin.json" ]; then LAYOUT=plugin
+elif [ -f "$DIR/SKILL.md" ];                  then LAYOUT=root
+elif compgen -G "$DIR/skills/*/SKILL.md" >/dev/null; then LAYOUT=skills-dir
+else echo "no SKILL.md, skills/ dir, or plugin.json in ${SUBPATH:-repo root} — nothing to install" >&2; exit 1
+fi
+echo "$SLUG @ ${SHA:0:12} (${REF})  layout: $LAYOUT"
+
+SRC_JSON="$(SLUG="$SLUG" URL="$URL" SUBPATH="$SUBPATH" REF="$REF" SHA="$SHA" python3 -c '
+import json, os
+p = os.environ
+if p["SUBPATH"]:
+    s = {"source":"git-subdir","url":p["URL"] if p["URL"].endswith(".git") else p["URL"]+".git",
+         "path":p["SUBPATH"],"ref":p["REF"],"sha":p["SHA"]}
+else:
+    s = {"source":"github","repo":p["SLUG"],"ref":p["REF"],"sha":p["SHA"]}
+print(json.dumps(s))')"
+
+ENTRY="$(MANIFEST="$MANIFEST" DIR="$DIR" LAYOUT="$LAYOUT" SLUG="$SLUG" SUBPATH="$SUBPATH" \
+         NAME="$NAME" SRC="$SRC_JSON" python3 - <<'PY'
+import json, os, re, pathlib, sys
+env, d = os.environ, pathlib.Path(os.environ["DIR"])
+layout = env["LAYOUT"]
+
+def frontmatter(p):
+    t = p.read_text(errors="replace")
+    m = re.match(r"^---\r?\n(.*?)\r?\n---", t, re.S)
+    if not m: return {}
+    out = {}
+    for line in m.group(1).splitlines():
+        k = re.match(r"^([A-Za-z_][\w-]*):\s*(.+?)\s*$", line)
+        if k: out[k.group(1)] = k.group(2).strip().strip('"\'')
+    return out
+
+name = desc = lic = None
+if layout == "plugin":
+    j = json.loads((d/".claude-plugin"/"plugin.json").read_text())
+    name, desc, lic = j.get("name"), j.get("description"), j.get("license")
+elif layout == "root":
+    fm = frontmatter(d/"SKILL.md")
+    name, desc = fm.get("name"), fm.get("description")
+else:
+    first = sorted(d.glob("skills/*/SKILL.md"))[0]
+    fm = frontmatter(first)
+    desc = fm.get("description")
+
+name = env["NAME"] or name or (env["SUBPATH"].rstrip("/").split("/")[-1] if env["SUBPATH"]
+                               else env["SLUG"].split("/")[-1])
+if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", name):
+    sys.exit(f"derived name {name!r} is not kebab-case; pass --name")
+
+if lic is None:
+    for c in ("LICENSE", "LICENSE.txt", "LICENSE.md"):
+        if (d/c).exists():
+            txt = (d/c).read_text(errors="replace")[:400]
+            lic = ("MIT" if "MIT License" in txt else
+                   "Apache-2.0" if "Apache License" in txt else None)
+            break
+
+e = {"name": name, "source": json.loads(env["SRC"])}
+if layout != "plugin":
+    e["strict"] = False
+    e["skills"] = "." if layout == "root" else "./skills"
+if desc: e["description"] = desc
+e["homepage"] = "https://github.com/" + env["SLUG"] + (
+    "/tree/HEAD/" + env["SUBPATH"] if env["SUBPATH"] else "")
+if lic: e["license"] = lic
+
+m = json.loads(pathlib.Path(env["MANIFEST"]).read_text())
+if any(p["name"] == name for p in m["plugins"]):
+    sys.exit(f"'{name}' is already in the marketplace — use bin/update-skills to move its pin")
+print(json.dumps(e))
+PY
+)"
+
+NAME="$(printf '%s' "$ENTRY" | jq -r .name)"
+ENTRY="$ENTRY" python3 -c '
+import json, os, pathlib
+p = pathlib.Path("'"$MANIFEST"'")
+m = json.loads(p.read_text())
+m["plugins"].append(json.loads(os.environ["ENTRY"]))
+m["plugins"].sort(key=lambda x: x["name"])
+p.write_text(json.dumps(m, indent=2) + "\n")'
+
+echo "--- entry added ---"
+jq --arg n "$NAME" '.plugins[] | select(.name == $n)' "$MANIFEST"
+
+claude plugin validate "$ROOT" --strict >/dev/null || { echo "validation failed; reverting" >&2; git -C "$ROOT" checkout -- "$MANIFEST"; exit 1; }
+echo "✔ manifest valid"
+
+git -C "$ROOT" add -A
+git -C "$ROOT" commit -qm "Add $NAME from $SLUG @ ${SHA:0:12}"
+git -C "$ROOT" push -q origin HEAD
+echo "✔ pushed"
+
+claude plugin marketplace update "$MKT" >/dev/null
+if [ "$INSTALL" = 1 ]; then
+  claude plugin install "$NAME@$MKT" --scope user
+  echo "Restart Claude Code (or /exit and relaunch) to load the new skill."
+else
+  echo "Skipped install. Run: claude plugin install $NAME@$MKT --scope user"
+fi

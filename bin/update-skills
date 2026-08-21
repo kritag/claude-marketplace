@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Move pins forward to upstream HEAD, then refresh what's installed locally.
+#
+#   bin/update-skills            # check every skill, prompt per update
+#   bin/update-skills stop-slop  # just this one
+#   bin/update-skills --check    # report only, change nothing
+#   bin/update-skills --yes      # take every update without prompting
+set -euo pipefail
+
+CHECK=0; ASSUME_YES=0; WANTED=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check)   CHECK=1; shift ;;
+    --yes|-y)  ASSUME_YES=1; shift ;;
+    -h|--help) sed -n '2,7p' "$0"; exit 0 ;;
+    *)         WANTED+=("$1"); shift ;;
+  esac
+done
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MANIFEST="$ROOT/.claude-plugin/marketplace.json"
+MKT="$(jq -r .name "$MANIFEST")"
+CHANGED=()
+
+while IFS=$'\t' read -r name repo ref pinned; do
+  if [ ${#WANTED[@]} -gt 0 ]; then
+    printf '%s\n' "${WANTED[@]}" | grep -qxF "$name" || continue
+  fi
+  case "$repo" in *://*|*@*:*) url="$repo" ;; *) url="https://github.com/$repo" ;; esac
+  slug="$(printf '%s' "$url" | sed -E 's#.*[:/]([^/]+/[^/]+?)(\.git)?$#\1#')"
+  upstream="$(git ls-remote "$url" "$ref" 2>/dev/null | cut -f1 | head -1)"
+
+  if [ -z "$upstream" ]; then
+    printf '%-22s %-10s UNREACHABLE (ref gone?)\n' "$name" "$ref"; continue
+  fi
+  if [ "$upstream" = "$pinned" ]; then
+    printf '%-22s %-10s up to date\n' "$name" "$ref"; continue
+  fi
+
+  printf '%-22s %-10s BEHIND\n  %s -> %s\n  review: https://github.com/%s/compare/%s...%s\n' \
+    "$name" "$ref" "${pinned:0:12}" "${upstream:0:12}" "$slug" "$pinned" "$upstream"
+  [ "$CHECK" = 1 ] && continue
+
+  if [ "$ASSUME_YES" = 0 ]; then
+    read -r -p "  move pin for $name? [y/N] " a < /dev/tty || a=n
+    case "$a" in [yY]*) ;; *) echo "  skipped"; continue ;; esac
+  fi
+
+  name="$name" upstream="$upstream" python3 -c '
+import json, os, pathlib
+p = pathlib.Path("'"$MANIFEST"'")
+m = json.loads(p.read_text())
+for e in m["plugins"]:
+    if e["name"] == os.environ["name"]:
+        e["source"]["sha"] = os.environ["upstream"]
+p.write_text(json.dumps(m, indent=2) + "\n")'
+  CHANGED+=("$name")
+  echo "  pinned to ${upstream:0:12}"
+done < <(jq -r '.plugins[]
+  | select(.source | type == "object")
+  | select(.source.source == "github" or .source.source == "git-subdir")
+  | [ .name, (.source.repo // .source.url), (.source.ref // "HEAD"), (.source.sha // "") ]
+  | @tsv' "$MANIFEST")
+
+if [ ${#CHANGED[@]} -eq 0 ]; then
+  echo "Nothing to do."
+  exit 0
+fi
+
+claude plugin validate "$ROOT" --strict >/dev/null || {
+  echo "validation failed; reverting" >&2; git -C "$ROOT" checkout -- "$MANIFEST"; exit 1; }
+
+git -C "$ROOT" add -A
+git -C "$ROOT" commit -qm "Update pins: ${CHANGED[*]}"
+git -C "$ROOT" push -q origin HEAD
+claude plugin marketplace update "$MKT" >/dev/null
+for n in "${CHANGED[@]}"; do claude plugin update "$n@$MKT"; done
+echo "Restart Claude Code to pick up the updated skills."
