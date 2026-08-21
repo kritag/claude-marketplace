@@ -1,0 +1,8 @@
+# Plugins to install, as plugin@marketplace. Installed at user scope.
+# Uncomment a line to adopt it on the next `bin/bootstrap`.
+
+stop-slop@kritag-tools
+
+# claude-mem@thedotmack   # hooks PreToolUse/PostToolUse/UserPromptSubmit/Stop,
+                          # an MCP server, a background worker, 19 skills of its own.
+                          # Reads everything you type and every tool result.

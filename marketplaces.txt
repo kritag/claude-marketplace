@@ -1,0 +1,6 @@
+# Third-party marketplaces to register. One source per line, in any form
+# `claude plugin marketplace add` accepts (owner/repo, https://, git@host:path).
+# Registering a marketplace only fetches a catalog — no plugin code runs.
+
+kritag/claude-marketplace     # this repo: loose skills with no marketplace of their own
+thedotmack/claude-mem         # claude-mem ships its own marketplace, named `thedotmack`

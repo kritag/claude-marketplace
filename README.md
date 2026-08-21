@@ -1,34 +1,37 @@
 # kritag-tools
 
-A curated collection of third-party Claude Code skills, each pinned to a commit
-I've reviewed. Nothing here is vendored and nothing is a submodule — each entry
-in `.claude-plugin/marketplace.json` points at an upstream repo and a `sha`.
-Claude Code fetches the content at install time.
+Bootstraps Claude Code on a new machine, and curates third-party skills that
+don't ship a marketplace of their own.
 
-## Install on a new machine
+Two layers, because they solve different problems:
+
+| File | Handles |
+| --- | --- |
+| `marketplaces.txt` + `plugins.txt` | Plugins that ship their own marketplace (`claude-mem`, Anthropic's official ones). Nothing to package — just register and install. |
+| `.claude-plugin/marketplace.json` | Loose skills that are a bare `SKILL.md` in someone's repo, with no marketplace to install them from. Pinned to a reviewed `sha`. |
+
+A marketplace catalogs plugins; it can't register another marketplace. That's why
+the text files exist alongside it.
+
+## Bootstrap a machine
 
 ```bash
-claude plugin marketplace add kritag/claude-marketplace
-claude plugin install stop-slop@kritag-tools --scope user
+git clone https://github.com/kritag/claude-marketplace
+claude-marketplace/bin/bootstrap
 ```
 
-Or declare it in `~/.claude/settings.json` and skip the commands entirely:
+Idempotent — re-run it any time. It reports per line whether something was added
+or already present, keeps going past failures, and exits non-zero if any step
+failed. Restart Claude Code afterward; skills and plugins load at session start.
 
-```json
-{
-  "extraKnownMarketplaces": {
-    "kritag-tools": {
-      "source": { "source": "github", "repo": "kritag/claude-marketplace" }
-    }
-  },
-  "enabledPlugins": { "stop-slop@kritag-tools": true }
-}
-```
+## Adding a plugin that has its own marketplace
 
-Reading this repo needs no credentials. Pushing to it does, so `bin/add-skill`
-and `bin/update-skills` only work from a clone whose remote can authenticate.
+Add its marketplace source to `marketplaces.txt` and the `plugin@marketplace` id
+to `plugins.txt`, then run `bin/bootstrap`. Install it the author's way rather
+than re-listing it here — plugins often hardcode their own marketplace name in
+hook paths, so repackaging them under this one breaks on their next release.
 
-## Adding a skill
+## Adding a loose skill
 
 ```bash
 bin/add-skill owner/repo                       # SKILL.md at the repo root

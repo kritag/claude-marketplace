@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Bring a machine up to the declared set of marketplaces and plugins.
+# Idempotent: safe to re-run. Reads marketplaces.txt and plugins.txt.
+set -uo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+rc=0
+
+strip() { sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$1"; }
+
+echo "== marketplaces =="
+while read -r src; do
+  [ -n "$src" ] || continue
+  if out=$(claude plugin marketplace add "$src" 2>&1); then
+    case "$out" in
+      *"already"*) printf '  %-32s already registered\n' "$src" ;;
+      *)           printf '  %-32s added\n' "$src" ;;
+    esac
+  else
+    printf '  %-32s FAILED\n' "$src"
+    printf '%s\n' "$out" | sed 's/^/      /' | head -4
+    rc=1
+  fi
+done < <(strip "$ROOT/marketplaces.txt")
+
+echo "== plugins =="
+while read -r p; do
+  [ -n "$p" ] || continue
+  if out=$(claude plugin install "$p" --scope user 2>&1); then
+    case "$out" in
+      *"already installed"*) printf '  %-32s already installed\n' "$p" ;;
+      *)                     printf '  %-32s installed\n' "$p" ;;
+    esac
+  else
+    printf '  %-32s FAILED\n' "$p"
+    printf '%s\n' "$out" | sed 's/^/      /' | head -4
+    rc=1
+  fi
+done < <(strip "$ROOT/plugins.txt")
+
+echo
+[ "$rc" = 0 ] && echo "Restart Claude Code to load everything." \
+              || echo "Some steps failed; see above." >&2
+exit "$rc"
