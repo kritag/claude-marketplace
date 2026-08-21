@@ -23,6 +23,20 @@
       "homepage": "https://github.com/vercel-labs/skills/tree/HEAD/skills/find-skills"
     },
     {
+      "name": "prompt-master",
+      "source": {
+        "source": "github",
+        "repo": "nidhinjs/prompt-master",
+        "ref": "main",
+        "sha": "d15eabbe5d2122eedc060bae8a771381e9873d1b"
+      },
+      "strict": false,
+      "skills": ".",
+      "description": "Generates optimized prompts for AI tools. Activates only when the user explicitly asks to write, fix, improve, or adapt a prompt for a specific AI tool (LLM, Cursor, Midjourney, image AI, video AI, coding agents, etc.). Does not activate for general conversation, coding tasks, document writing, or other non-prompt-engineering work.",
+      "homepage": "https://github.com/nidhinjs/prompt-master",
+      "license": "MIT"
+    },
+    {
       "name": "stop-slop",
       "source": {
         "source": "github",
