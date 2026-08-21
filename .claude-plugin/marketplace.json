@@ -9,6 +9,20 @@
   },
   "plugins": [
     {
+      "name": "find-skills",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/vercel-labs/skills.git",
+        "path": "skills/find-skills",
+        "ref": "main",
+        "sha": "435076e78988e1e6ec40d00b0b1d76bdbbc5419a"
+      },
+      "strict": false,
+      "skills": ".",
+      "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilities. This skill should be used when the user is looking for functionality that might exist as an installable skill.",
+      "homepage": "https://github.com/vercel-labs/skills/tree/HEAD/skills/find-skills"
+    },
+    {
       "name": "stop-slop",
       "source": {
         "source": "github",
