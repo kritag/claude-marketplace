@@ -74,10 +74,24 @@ def frontmatter(p):
     t = p.read_text(errors="replace")
     m = re.match(r"^---\r?\n(.*?)\r?\n---", t, re.S)
     if not m: return {}
-    out = {}
-    for line in m.group(1).splitlines():
-        k = re.match(r"^([A-Za-z_][\w-]*):\s*(.+?)\s*$", line)
-        if k: out[k.group(1)] = k.group(2).strip().strip('"\'')
+    lines, out, i = m.group(1).splitlines(), {}, 0
+    while i < len(lines):
+        k = re.match(r"^([A-Za-z_][\w-]*):[ \t]*(.*)$", lines[i])
+        if not k:
+            i += 1
+            continue
+        key, val = k.group(1), k.group(2).strip()
+        if val in (">", "|", ">-", "|-", ">+", "|+"):
+            # YAML block scalar: consume the indented lines that follow
+            fold, block, i = val[0] == ">", [], i + 1
+            while i < len(lines) and (not lines[i].strip() or lines[i][:1] in " \t"):
+                block.append(lines[i].strip())
+                i += 1
+            joined = " ".join(x for x in block if x) if fold else "\n".join(block)
+            out[key] = joined.strip()
+        else:
+            out[key] = val.strip('"\'')
+            i += 1
     return out
 
 name = desc = lic = None
