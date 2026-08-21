@@ -71,7 +71,11 @@ claude plugin validate "$ROOT" --strict >/dev/null || {
   echo "validation failed; reverting" >&2; git -C "$ROOT" checkout -- "$MANIFEST"; exit 1; }
 
 git -C "$ROOT" add -A
-git -C "$ROOT" commit -qm "Update pins: ${CHANGED[*]}"
+if git -C "$ROOT" diff --cached --quiet; then
+  echo "pins already match HEAD — nothing to commit"
+else
+  git -C "$ROOT" commit -qm "Update pins: ${CHANGED[*]}"
+fi
 git -C "$ROOT" push -q origin HEAD
 claude plugin marketplace update "$MKT" >/dev/null
 for n in "${CHANGED[@]}"; do claude plugin update "$n@$MKT"; done

@@ -137,7 +137,11 @@ claude plugin validate "$ROOT" --strict >/dev/null || { echo "validation failed;
 echo "✔ manifest valid"
 
 git -C "$ROOT" add -A
-git -C "$ROOT" commit -qm "Add $NAME from $SLUG @ ${SHA:0:12}"
+if git -C "$ROOT" diff --cached --quiet; then
+  echo "manifest already matches HEAD — nothing to commit"
+else
+  git -C "$ROOT" commit -qm "Add $NAME from $SLUG @ ${SHA:0:12}"
+fi
 git -C "$ROOT" push -q origin HEAD
 echo "✔ pushed"
 

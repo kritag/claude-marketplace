@@ -27,68 +27,51 @@ Or declare it in `~/.claude/settings.json` and skip the commands entirely:
 
 ## Adding a skill
 
-Get the commit you want, add an entry, validate, commit.
+```bash
+bin/add-skill owner/repo                       # SKILL.md at the repo root
+bin/add-skill owner/repo --path skills/pdf     # skill inside a monorepo
+bin/add-skill owner/repo --ref v2.0.0          # pin a tag instead of main
+bin/add-skill owner/repo --name better-name --no-install
+```
+
+It resolves the current sha, shallow-fetches the repo to inspect it, and works
+out how the entry has to be shaped:
+
+| What's in the repo | How it's added |
+| --- | --- |
+| `SKILL.md` at the root | `strict: false`, `skills: "."` |
+| `skills/<name>/SKILL.md` | `strict: false`, `skills: "./skills"` |
+| `.claude-plugin/plugin.json` | left alone — its own manifest defines components |
+
+The name and description come from the `SKILL.md` frontmatter (or `plugin.json`),
+`--path` switches the source to `git-subdir` so a monorepo sparse-clones instead
+of pulling everything, and the entry is validated before anything is committed.
+Then it commits, pushes, refreshes the marketplace, and installs.
+
+It refuses to do anything if the ref doesn't resolve, the `--path` doesn't exist,
+the repo has no skill in it, or the name is already taken — and leaves the
+manifest untouched when it refuses.
+
+## Updating
 
 ```bash
-git ls-remote https://github.com/owner/repo main   # copy the full 40-char sha
+bin/update-skills --check        # report only, change nothing
+bin/update-skills               # prompt per skill, with a compare URL to review
+bin/update-skills stop-slop     # just one
+bin/update-skills --yes         # take everything without prompting
 ```
 
-For a repo with `SKILL.md` at the root and no `plugin.json` (the common shape for
-a standalone skill), `strict: false` plus `"skills": "."` is required — without
-them it isn't a valid plugin:
+Anything behind prints a `compare/<pinned>...<upstream>` URL. Read the diff
+before you accept it — that review step is the entire reason the pins exist.
+Accepting bumps the sha, commits, pushes, refreshes the marketplace and updates
+the installed plugin.
 
-```json
-{
-  "name": "some-skill",
-  "source": {
-    "source": "github", "repo": "owner/repo",
-    "ref": "main", "sha": "<full 40-char sha>"
-  },
-  "strict": false,
-  "skills": ".",
-  "category": "writing",
-  "homepage": "https://github.com/owner/repo",
-  "license": "MIT"
-}
-```
+## Why pushing matters
 
-If the skill sits in a subdirectory of a monorepo, use `git-subdir` — it sparse
-clones, so you don't pull the whole repo:
+The marketplace is registered by its git URL, not by the local path, so Claude
+Code reads its own clone under `~/.claude/plugins/marketplaces/kritag-tools`.
+Editing `marketplace.json` here changes nothing until it's pushed. Both scripts
+push for you, which is why they exist.
 
-```json
-{
-  "source": "git-subdir",
-  "url": "https://github.com/owner/repo.git",
-  "path": "skills/some-skill",
-  "ref": "main",
-  "sha": "<sha>"
-}
-```
-
-If the upstream repo already ships a proper `.claude-plugin/plugin.json`, drop
-`strict` and `skills` and let its own manifest define the components.
-
-Then:
-
-```bash
-claude plugin validate . --strict
-```
-
-## Updating pins
-
-`bin/check-updates` compares every pinned sha against upstream and prints a
-compare URL for anything behind:
-
-```bash
-./bin/check-updates
-```
-
-Review the diff, bump the `sha`, commit, push, then:
-
-```bash
-claude plugin marketplace update kritag-tools
-claude plugin update some-skill@kritag-tools
-```
-
-Pinning is the point: an upstream force-push or a hijacked account can't change
-what you run until you deliberately move the sha.
+After either script, restart Claude Code — skills are discovered at session
+start.
