@@ -4,3 +4,4 @@
 
 kritag/claude-marketplace     # this repo: loose skills with no marketplace of their own
 thedotmack/claude-mem         # claude-mem ships its own marketplace, named `thedotmack`
+ayghri/i-have-adhd            # ships its own marketplace, named `i-have-adhd`
