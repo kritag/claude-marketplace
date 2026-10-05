@@ -29,7 +29,7 @@
         "url": "https://github.com/vercel-labs/skills.git",
         "path": "skills/find-skills",
         "ref": "main",
-        "sha": "435076e78988e1e6ec40d00b0b1d76bdbbc5419a"
+        "sha": "18f96ea131dab3b0fcc9b27cf7c6f6cbb6174680"
       },
       "strict": false,
       "skills": ".",
@@ -60,7 +60,7 @@
         "source": "github",
         "repo": "nidhinjs/prompt-master",
         "ref": "main",
-        "sha": "d15eabbe5d2122eedc060bae8a771381e9873d1b"
+        "sha": "2bd92518e26bf659e21e3d9ab90573fcf3ddeccb"
       },
       "strict": false,
       "skills": ".",
@@ -93,7 +93,7 @@
         "source": "github",
         "repo": "rebelytics/one-skill-to-rule-them-all",
         "ref": "main",
-        "sha": "281f13466cd3a73e9ebc9d210907748e1941a3dd"
+        "sha": "da860265ae968bdc6bb13b96c2c75fcb61176b72"
       },
       "strict": false,
       "skills": ".",
