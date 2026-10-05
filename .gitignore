@@ -8,3 +8,12 @@ dist-lean/
 .claude-flow/data/
 .claude-flow/logs/
 .claude-flow/sessions/
+.claude-flow/metrics/
+.claude-flow/security/audit-status.json
+.claude-flow/harness-active-policy.json
+.claude-flow/policy/
+
+# Local/generated Claude Code state
+.claude/settings.local.json
+.claude/.proven-config-version
+.claude/proven-config.json
