@@ -37,6 +37,24 @@
       "homepage": "https://github.com/vercel-labs/skills/tree/HEAD/skills/find-skills"
     },
     {
+      "name": "no-ai-slop",
+      "source": {
+        "source": "github",
+        "repo": "petergyang/no-ai-slop",
+        "ref": "main",
+        "sha": "000650b156983f5159695b441477f4e63b25dc85"
+      },
+      "strict": false,
+      "category": "writing",
+      "description": "Edit drafts into sharper, more human writing while preserving the writer's personal voice, or detect AI-slop patterns without rewriting. Use when the user wants a draft clearer, more direct, more opinionated, or less AI-sounding, or asks whether writing reads as AI.",
+      "author": {
+        "name": "Peter Yang",
+        "url": "https://github.com/petergyang"
+      },
+      "homepage": "https://github.com/petergyang/no-ai-slop",
+      "license": "MIT"
+    },
+    {
       "name": "prompt-master",
       "source": {
         "source": "github",
